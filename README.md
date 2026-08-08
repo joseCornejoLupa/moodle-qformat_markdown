@@ -31,6 +31,7 @@ Mark correct answers with `[x]`:
 
 ## What is the value of Pi to two decimal places?
 =# 3.14:0.01
+> Rounded to two decimal places.
 ```
 
 Rules:
@@ -45,6 +46,9 @@ Rules:
   Tolerance defaults to `0` (exact match) when omitted.
 - Don't mix `- [ ]` checkboxes and `=`/`=#` lines in the same block — whichever
   the parser sees first (numerical, then short answer, then checkboxes) wins.
+- Any `> feedback text` line, regardless of question type, becomes general
+  feedback shown after the question is answered. Several `> ` lines in the
+  same block are joined into one feedback with line breaks between them.
 
 ## Installation
 
@@ -80,7 +84,6 @@ and MariaDB (see the CI matrix).
 
 ## Roadmap
 
-- Per-question feedback via blockquotes.
 - YAML front matter for categories and default marks.
 - Export from the question bank back to Markdown.
 

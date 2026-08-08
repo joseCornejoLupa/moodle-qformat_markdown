@@ -160,6 +160,53 @@ final class format_test extends \advanced_testcase {
     }
 
     /**
+     * "> " lines become general feedback, regardless of question type.
+     */
+    public function test_import_blockquote_feedback(): void {
+        $md = "## What is the capital of France?\n" .
+              "- [ ] London\n" .
+              "- [x] Paris\n" .
+              "- [ ] Madrid\n" .
+              "> Paris has been the capital since 508 AD.\n";
+
+        $questions = $this->import($md);
+
+        $question = $questions[0];
+        $this->assertSame('Paris has been the capital since 508 AD.', $question->generalfeedback);
+    }
+
+    /**
+     * Several "> " lines in one block are joined with line breaks.
+     */
+    public function test_import_blockquote_feedback_multiline(): void {
+        $md = "## What is the capital of Peru?\n" .
+              "= Lima\n" .
+              "> Lima is the capital and largest city of Peru.\n" .
+              "> It was founded in 1535.\n";
+
+        $questions = $this->import($md);
+
+        $question = $questions[0];
+        $this->assertSame(
+            "Lima is the capital and largest city of Peru.\nIt was founded in 1535.",
+            $question->generalfeedback
+        );
+    }
+
+    /**
+     * A block without any "> " line keeps the default empty feedback.
+     */
+    public function test_import_without_feedback_leaves_it_blank(): void {
+        $md = "## What is 6 times 7?\n" .
+              "=# 42\n";
+
+        $questions = $this->import($md);
+
+        $question = $questions[0];
+        $this->assertSame('', $question->generalfeedback);
+    }
+
+    /**
      * Several questions in one file are all imported.
      */
     public function test_import_multiple_questions(): void {

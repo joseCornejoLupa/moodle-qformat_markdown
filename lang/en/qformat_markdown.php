@@ -24,5 +24,5 @@
 
 $string['noquestionsfound'] = 'No questions were found in the file. Check that each question starts with "## " and is followed by at least two "- [ ]" options, one or more "= " answers, or one or more "=# " numerical answers.';
 $string['pluginname'] = 'Markdown format';
-$string['pluginname_help'] = 'Import questions written in a simple Markdown checklist syntax: each question is a "## " heading followed by "- [ ]" / "- [x]" options (multiple choice or true/false), "= " lines (short answer), or "=# " lines (numerical).';
+$string['pluginname_help'] = 'Import questions written in a simple Markdown checklist syntax: each question is a "## " heading followed by "- [ ]" / "- [x]" options (multiple choice or true/false), "= " lines (short answer), or "=# " lines (numerical). An optional "> " line adds general feedback.';
 $string['privacy:metadata'] = 'The Markdown question format plugin does not store any personal data.';

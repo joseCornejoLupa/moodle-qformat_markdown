@@ -33,6 +33,7 @@
  *
  * ## What is the value of Pi to two decimal places?
  * =# 3.14:0.01
+ * > Rounded to two decimal places.
  *
  * A question with more than one "[x]" becomes a multi-answer
  * multichoice question. A question whose only options are True/False
@@ -41,7 +42,9 @@
  * line. A question with "=# " lines becomes a numerical question; each
  * line is "value" or "value:tolerance". Either way, every listed answer
  * is worth full credit. Don't mix checkbox and "="/"=#" lines in the
- * same block.
+ * same block. Any "> " line in a block (regardless of qtype) becomes
+ * general feedback shown after the question is answered; multiple "> "
+ * lines are joined into one feedback with line breaks.
  *
  * @package    qformat_markdown
  * @copyright  2026 José Cornejo <jose.cornejo.lupa@gmail.com>
@@ -254,6 +257,7 @@ class qformat_markdown extends qformat_default {
         $checkboxes = [];
         $shortanswers = [];
         $numericals = [];
+        $feedbacklines = [];
         foreach ($block as $line) {
             $line = trim($line);
             if (preg_match('/^-\s*\[( |x|X)\]\s*(.+)$/', $line, $matches)) {
@@ -265,6 +269,8 @@ class qformat_markdown extends qformat_default {
                 $numericals[] = trim($matches[1]);
             } else if (preg_match('/^=\s*(.+)$/', $line, $matches)) {
                 $shortanswers[] = trim($matches[1]);
+            } else if (preg_match('/^>\s?(.*)$/', $line, $matches)) {
+                $feedbacklines[] = $matches[1];
             }
         }
 
@@ -278,6 +284,11 @@ class qformat_markdown extends qformat_default {
                     : $this->build_multichoice($name, $checkboxes);
         } else {
             return null;
+        }
+
+        if (!empty($feedbacklines)) {
+            $question->generalfeedback = implode("\n", $feedbacklines);
+            $question->generalfeedbackformat = FORMAT_MARKDOWN;
         }
 
         $this->importednames[] = $question->name;
