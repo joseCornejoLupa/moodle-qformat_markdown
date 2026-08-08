@@ -19,6 +19,11 @@
  *
  * Supported syntax (v0.1):
  *
+ * ---
+ * category: Quiz de PHP
+ * defaultmark: 2
+ * ---
+ *
  * ## What is the capital of France?
  * - [ ] London
  * - [x] Paris
@@ -46,6 +51,12 @@
  * general feedback shown after the question is answered; multiple "> "
  * lines are joined into one feedback with line breaks.
  *
+ * An optional "---" ... "---" front matter block at the very start of the
+ * file sets defaults for the whole import: "category" (created under the
+ * category selected in the import screen if it doesn't exist yet; "/"
+ * nests subcategories) and "defaultmark" (applied to every question in
+ * the file, instead of Moodle's default of 1).
+ *
  * @package    qformat_markdown
  * @copyright  2026 José Cornejo <jose.cornejo.lupa@gmail.com>
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -68,6 +79,16 @@ class qformat_markdown extends qformat_default {
      * @var string[]
      */
     protected array $importednames = [];
+
+    /**
+     * Default mark for every question in this import, from the "defaultmark"
+     * key in the file's YAML front matter, or null to use Moodle's own
+     * default (1). Only populated when importing through importprocess();
+     * calling readquestions() directly (as in unit tests) leaves it null.
+     *
+     * @var float|null
+     */
+    protected ?float $frontmatterdefaultmark = null;
 
     /**
      * This format can be used to import questions.
@@ -108,6 +129,8 @@ class qformat_markdown extends qformat_default {
      * @return bool success
      */
     public function importprocess() {
+        $this->apply_front_matter();
+
         $before = $this->existing_entries_by_name();
 
         $result = parent::importprocess();
@@ -117,6 +140,63 @@ class qformat_markdown extends qformat_default {
         }
 
         return $result;
+    }
+
+    /**
+     * Read the file's optional YAML-ish front matter and apply it: switch
+     * the target category (creating it under the one selected in the
+     * import screen if needed) and/or remember a default mark for every
+     * question in this import. Must run before existing_entries_by_name(),
+     * so that a category change is already in effect when snapshotting
+     * what "before this import" means.
+     */
+    protected function apply_front_matter(): void {
+        $lines = $this->readdata($this->filename);
+        if ($lines === false) {
+            return;
+        }
+
+        $frontmatter = $this->extract_front_matter($lines);
+
+        $this->frontmatterdefaultmark = isset($frontmatter['defaultmark']) && is_numeric($frontmatter['defaultmark'])
+                ? (float) $frontmatter['defaultmark']
+                : null;
+
+        if (!empty($frontmatter['category'])) {
+            $newcategory = $this->create_category_path($frontmatter['category']);
+            if (!empty($newcategory)) {
+                $this->category = $newcategory;
+            }
+        }
+    }
+
+    /**
+     * Parse a "---" ... "---" front matter block at the start of the file,
+     * if there is one, into a key => value map. Values are plain strings;
+     * surrounding quotes are stripped.
+     *
+     * @param array $lines raw lines from the file.
+     * @return array<string, string>
+     */
+    protected function extract_front_matter(array $lines): array {
+        if (!isset($lines[0]) || trim($lines[0]) !== '---') {
+            return [];
+        }
+
+        $frontmatter = [];
+        foreach ($lines as $index => $line) {
+            if ($index === 0) {
+                continue;
+            }
+            if (trim($line) === '---') {
+                break;
+            }
+            if (preg_match('/^([A-Za-z0-9_]+):\s*(.*)$/', trim($line), $matches)) {
+                $frontmatter[$matches[1]] = trim($matches[2], " \t\"'");
+            }
+        }
+
+        return $frontmatter;
     }
 
     /**
@@ -289,6 +369,10 @@ class qformat_markdown extends qformat_default {
         if (!empty($feedbacklines)) {
             $question->generalfeedback = implode("\n", $feedbacklines);
             $question->generalfeedbackformat = FORMAT_MARKDOWN;
+        }
+
+        if ($this->frontmatterdefaultmark !== null) {
+            $question->defaultmark = $this->frontmatterdefaultmark;
         }
 
         $this->importednames[] = $question->name;

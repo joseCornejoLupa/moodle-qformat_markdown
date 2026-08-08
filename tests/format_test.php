@@ -239,8 +239,10 @@ final class format_test extends \advanced_testcase {
      *
      * @param string $content markdown content.
      * @param \stdClass $category question_categories record to import into.
+     * @return qformat_markdown the importer used, after import (its
+     *      ->category reflects any front matter "category" switch).
      */
-    protected function full_import(string $content, \stdClass $category): void {
+    protected function full_import(string $content, \stdClass $category): qformat_markdown {
         $path = make_request_directory() . '/import.md';
         file_put_contents($path, $content);
 
@@ -253,6 +255,8 @@ final class format_test extends \advanced_testcase {
         $importer->set_display_progress(false);
 
         $this->assertTrue($importer->importprocess());
+
+        return $importer;
     }
 
     /**
@@ -321,6 +325,67 @@ final class format_test extends \advanced_testcase {
         $this->assertEquals(
             1,
             $DB->count_records('question_versions', ['questionbankentryid' => $originalentry->id])
+        );
+    }
+
+    /**
+     * A "defaultmark" front matter key sets the mark on every question in
+     * the file, instead of Moodle's own default of 1.
+     */
+    public function test_front_matter_defaultmark(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+
+        $md = "---\n" .
+              "defaultmark: 2\n" .
+              "---\n" .
+              "## What is the capital of France?\n" .
+              "- [ ] London\n" .
+              "- [x] Paris\n";
+
+        $this->full_import($md, $category);
+
+        $question = $DB->get_record('question', ['name' => 'What is the capital of France?'], '*', MUST_EXIST);
+        $this->assertEqualsWithDelta(2.0, $question->defaultmark, 0.0001);
+    }
+
+    /**
+     * A "category" front matter key creates (or reuses) a subcategory of
+     * the one selected in the import screen, and questions are imported
+     * into it instead.
+     */
+    public function test_front_matter_category(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+
+        $md = "---\n" .
+              "category: Quiz de PHP\n" .
+              "---\n" .
+              "## PHP is a compiled language.\n" .
+              "- [x] False\n" .
+              "- [ ] True\n";
+
+        $importer = $this->full_import($md, $category);
+
+        $this->assertNotEquals($category->id, $importer->category->id);
+        $this->assertSame('Quiz de PHP', $importer->category->name);
+        $this->assertEquals(
+            0,
+            $DB->count_records('question_bank_entries', ['questioncategoryid' => $category->id])
+        );
+        $this->assertEquals(
+            1,
+            $DB->count_records('question_bank_entries', ['questioncategoryid' => $importer->category->id])
         );
     }
 }

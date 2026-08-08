@@ -12,6 +12,11 @@ Each question is a level-2 heading (`## `) followed by checklist options.
 Mark correct answers with `[x]`:
 
 ```markdown
+---
+category: Quiz de PHP
+defaultmark: 2
+---
+
 ## What is the capital of France?
 - [ ] London
 - [x] Paris
@@ -50,6 +55,20 @@ Rules:
   feedback shown after the question is answered. Several `> ` lines in the
   same block are joined into one feedback with line breaks between them.
 
+## Front matter
+
+An optional `---` / `---` block at the very start of the file sets
+defaults for every question in it:
+
+- `category`: created (or reused, if it already exists) as a subcategory
+  of the category selected in the import screen. Use `/` to nest, e.g.
+  `Quiz de PHP/Preguntas basicas`.
+- `defaultmark`: applied to every question in the file, instead of
+  Moodle's own default of `1`.
+
+Both keys are optional, and the block itself is optional — a file with no
+front matter behaves exactly as before.
+
 ## Installation
 
 1. Copy this directory to `question/format/markdown` inside your Moodle root.
@@ -84,7 +103,6 @@ and MariaDB (see the CI matrix).
 
 ## Roadmap
 
-- YAML front matter for categories and default marks.
 - Export from the question bank back to Markdown.
 
 ## License
