@@ -41,7 +41,6 @@ require_once($CFG->dirroot . '/question/format/markdown/format.php');
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 final class format_test extends \advanced_testcase {
-
     /**
      * Helper to run the importer over fixture content.
      *

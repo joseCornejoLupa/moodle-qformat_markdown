@@ -37,8 +37,6 @@
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * Importer for questions written in a simple Markdown checklist syntax.
  *
@@ -46,7 +44,6 @@ defined('MOODLE_INTERNAL') || die();
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class qformat_markdown extends qformat_default {
-
     /**
      * This format can be used to import questions.
      *
