@@ -109,7 +109,7 @@ class qformat_markdown extends qformat_default {
      * Map the name of the current, latest-version question in each bank
      * entry of the target category to that entry's id.
      *
-     * @return array<string, int> name => question_bank_entries.id
+     * @return array name (string) => question_bank_entries.id (int)
      */
     protected function existing_entries_by_name(): array {
         global $DB;
@@ -136,7 +136,7 @@ class qformat_markdown extends qformat_default {
      * question_bank_entries row (as the next version number) and drop the
      * now-empty entry that the standard import created for it.
      *
-     * @param array<string, int> $before name => entry id, from before this import ran.
+     * @param array $before name (string) => entry id (int), from before this import ran.
      */
     protected function merge_reimported_questions(array $before): void {
         global $DB;
