@@ -22,7 +22,7 @@
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-$string['noquestionsfound'] = 'No se encontraron preguntas en el archivo. Verifica que cada pregunta empiece con "## " y tenga al menos dos opciones "- [ ]".';
+$string['noquestionsfound'] = 'No se encontraron preguntas en el archivo. Verifica que cada pregunta empiece con "## " y esté seguida de al menos dos opciones "- [ ]", una o más respuestas "= ", o una o más respuestas numéricas "=# ".';
 $string['pluginname'] = 'Formato Markdown';
-$string['pluginname_help'] = 'Importa preguntas escritas en una sintaxis simple de Markdown: cada pregunta es un encabezado "## " seguido de opciones "- [ ]" / "- [x]".';
+$string['pluginname_help'] = 'Importa preguntas escritas en una sintaxis simple de Markdown: cada pregunta es un encabezado "## " seguido de opciones "- [ ]" / "- [x]" (opción múltiple o verdadero/falso), líneas "= " (respuesta corta), o líneas "=# " (numérica).';
 $string['privacy:metadata'] = 'El plugin de formato de preguntas Markdown no almacena ningún dato personal.';

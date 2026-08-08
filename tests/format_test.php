@@ -110,6 +110,56 @@ final class format_test extends \advanced_testcase {
     }
 
     /**
+     * "= " lines produce a shortanswer question, one accepted answer per
+     * line, each worth full credit.
+     */
+    public function test_import_shortanswer(): void {
+        $md = "## What is the capital of France?\n" .
+              "= Paris\n" .
+              "= paris\n";
+
+        $questions = $this->import($md);
+
+        $this->assertCount(1, $questions);
+        $question = $questions[0];
+        $this->assertSame('shortanswer', $question->qtype);
+        $this->assertSame(['Paris', 'paris'], $question->answer);
+        $this->assertEqualsWithDelta(1.0, $question->fraction[0], 0.0001);
+        $this->assertEqualsWithDelta(1.0, $question->fraction[1], 0.0001);
+    }
+
+    /**
+     * "=# value:tolerance" lines produce a numerical question.
+     */
+    public function test_import_numerical_with_tolerance(): void {
+        $md = "## What is the value of Pi to two decimal places?\n" .
+              "=# 3.14:0.01\n";
+
+        $questions = $this->import($md);
+
+        $this->assertCount(1, $questions);
+        $question = $questions[0];
+        $this->assertSame('numerical', $question->qtype);
+        $this->assertSame('3.14', $question->answer[0]);
+        $this->assertSame('0.01', $question->tolerance[0]);
+    }
+
+    /**
+     * "=# value" without a tolerance defaults to an exact match (0).
+     */
+    public function test_import_numerical_without_tolerance(): void {
+        $md = "## What is 6 times 7?\n" .
+              "=# 42\n";
+
+        $questions = $this->import($md);
+
+        $question = $questions[0];
+        $this->assertSame('numerical', $question->qtype);
+        $this->assertSame('42', $question->answer[0]);
+        $this->assertSame('0', $question->tolerance[0]);
+    }
+
+    /**
      * Several questions in one file are all imported.
      */
     public function test_import_multiple_questions(): void {

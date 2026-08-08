@@ -28,9 +28,20 @@
  * - [x] False
  * - [ ] True
  *
+ * ## What is the capital of Peru?
+ * = Lima
+ *
+ * ## What is the value of Pi to two decimal places?
+ * =# 3.14:0.01
+ *
  * A question with more than one "[x]" becomes a multi-answer
  * multichoice question. A question whose only options are True/False
- * becomes a truefalse question.
+ * becomes a truefalse question. A question with "= " lines instead of
+ * checkboxes becomes a shortanswer question, one accepted answer per
+ * line. A question with "=# " lines becomes a numerical question; each
+ * line is "value" or "value:tolerance". Either way, every listed answer
+ * is worth full credit. Don't mix checkbox and "="/"=#" lines in the
+ * same block.
  *
  * @package    qformat_markdown
  * @copyright  2026 José Cornejo <jose.cornejo.lupa@gmail.com>
@@ -240,25 +251,35 @@ class qformat_markdown extends qformat_default {
             return null;
         }
 
-        $answers = [];
+        $checkboxes = [];
+        $shortanswers = [];
+        $numericals = [];
         foreach ($block as $line) {
-            if (preg_match('/^-\s*\[( |x|X)\]\s*(.+)$/', trim($line), $matches)) {
-                $answers[] = [
+            $line = trim($line);
+            if (preg_match('/^-\s*\[( |x|X)\]\s*(.+)$/', $line, $matches)) {
+                $checkboxes[] = [
                     'correct' => strtolower($matches[1]) === 'x',
                     'text' => trim($matches[2]),
                 ];
+            } else if (preg_match('/^=#\s*(.+)$/', $line, $matches)) {
+                $numericals[] = trim($matches[1]);
+            } else if (preg_match('/^=\s*(.+)$/', $line, $matches)) {
+                $shortanswers[] = trim($matches[1]);
             }
         }
 
-        if (count($answers) < 2) {
+        if (!empty($numericals)) {
+            $question = $this->build_numerical($name, $numericals);
+        } else if (!empty($shortanswers)) {
+            $question = $this->build_shortanswer($name, $shortanswers);
+        } else if (count($checkboxes) >= 2) {
+            $question = $this->is_truefalse($checkboxes)
+                    ? $this->build_truefalse($name, $checkboxes)
+                    : $this->build_multichoice($name, $checkboxes);
+        } else {
             return null;
         }
 
-        if ($this->is_truefalse($answers)) {
-            $question = $this->build_truefalse($name, $answers);
-        } else {
-            $question = $this->build_multichoice($name, $answers);
-        }
         $this->importednames[] = $question->name;
         return $question;
     }
@@ -348,6 +369,66 @@ class qformat_markdown extends qformat_default {
         $question->correctfeedback = ['text' => '', 'format' => FORMAT_MARKDOWN];
         $question->partiallycorrectfeedback = ['text' => '', 'format' => FORMAT_MARKDOWN];
         $question->incorrectfeedback = ['text' => '', 'format' => FORMAT_MARKDOWN];
+
+        return $question;
+    }
+
+    /**
+     * Build a shortanswer question object. Every listed answer is an
+     * alternative worth full credit.
+     *
+     * @param string $name question name/text.
+     * @param string[] $answers accepted answer strings, one per "= " line.
+     * @return stdClass
+     */
+    protected function build_shortanswer(string $name, array $answers): stdClass {
+        $question = $this->defaultquestion();
+        $question->qtype = 'shortanswer';
+        $question->name = shorten_text($name, 250);
+        $question->questiontext = $name;
+        $question->questiontextformat = FORMAT_MARKDOWN;
+        $question->usecase = 0;
+
+        $question->answer = [];
+        $question->fraction = [];
+        $question->feedback = [];
+
+        foreach ($answers as $answer) {
+            $question->answer[] = $answer;
+            $question->fraction[] = 1.0;
+            $question->feedback[] = ['text' => '', 'format' => FORMAT_MARKDOWN];
+        }
+
+        return $question;
+    }
+
+    /**
+     * Build a numerical question object. Every listed answer is an
+     * alternative worth full credit.
+     *
+     * @param string $name question name/text.
+     * @param string[] $answers "value" or "value:tolerance" strings, one per "=# " line.
+     * @return stdClass
+     */
+    protected function build_numerical(string $name, array $answers): stdClass {
+        $question = $this->defaultquestion();
+        $question->qtype = 'numerical';
+        $question->name = shorten_text($name, 250);
+        $question->questiontext = $name;
+        $question->questiontextformat = FORMAT_MARKDOWN;
+
+        $question->answer = [];
+        $question->fraction = [];
+        $question->feedback = [];
+        $question->tolerance = [];
+
+        foreach ($answers as $answer) {
+            [$value, $tolerance] = array_pad(explode(':', $answer, 2), 2, '0');
+            $question->answer[] = trim($value);
+            $question->tolerance[] = trim($tolerance);
+            $question->fraction[] = 1.0;
+            $question->feedback[] = ['text' => '', 'format' => FORMAT_MARKDOWN];
+        }
 
         return $question;
     }

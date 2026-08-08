@@ -25,6 +25,12 @@ Mark correct answers with `[x]`:
 ## PHP is a compiled language.
 - [x] False
 - [ ] True
+
+## What is the capital of Peru?
+= Lima
+
+## What is the value of Pi to two decimal places?
+=# 3.14:0.01
 ```
 
 Rules:
@@ -32,7 +38,13 @@ Rules:
 - One correct option → single-answer multiple choice.
 - Several correct options → multi-answer multiple choice (credit split evenly).
 - Exactly the options `True` and `False` → a True/False question.
-- Blocks with fewer than two options are skipped.
+- Blocks with fewer than two `- [ ]` options are skipped.
+- One or more `= answer` lines (instead of checkboxes) → short answer question.
+  Each line is an accepted answer, all worth full credit.
+- One or more `=# value` or `=# value:tolerance` lines → numerical question.
+  Tolerance defaults to `0` (exact match) when omitted.
+- Don't mix `- [ ]` checkboxes and `=`/`=#` lines in the same block — whichever
+  the parser sees first (numerical, then short answer, then checkboxes) wins.
 
 ## Installation
 
@@ -68,7 +80,6 @@ and MariaDB (see the CI matrix).
 
 ## Roadmap
 
-- Short answer and numerical question support.
 - Per-question feedback via blockquotes.
 - YAML front matter for categories and default marks.
 - Export from the question bank back to Markdown.
