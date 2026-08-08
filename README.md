@@ -47,6 +47,20 @@ Or install from a zip via *Site administration → Plugins → Install plugins*.
 2. Choose **Markdown format**.
 3. Upload your `.md` file and import.
 
+## Re-importing (editing questions)
+
+Re-importing the same file updates existing questions instead of
+duplicating them: a question is matched to an existing one in the target
+category by its **name** (the heading text). A match creates a new
+*version* of that question — visible in the question bank's version
+history — rather than a separate entry. A heading with no match in the
+category is imported as a new question, and existing questions are left
+untouched.
+
+Known limitation: if two questions in the same category share the exact
+same heading text, the match is ambiguous — only rename questions you
+want to keep distinct.
+
 ## Supported versions
 
 Tested against Moodle 4.4, 4.5 and 5.0 on PHP 8.2/8.3 with PostgreSQL
