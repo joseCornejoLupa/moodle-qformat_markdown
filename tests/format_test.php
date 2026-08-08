@@ -423,4 +423,95 @@ final class format_test extends \advanced_testcase {
             $DB->count_records('question_bank_entries', ['questioncategoryid' => $importer->category->id])
         );
     }
+
+    /**
+     * Export the given category through the full exportprocess() pipeline.
+     *
+     * @param \stdClass $category question_categories record to export from.
+     * @return string the exported file content.
+     */
+    protected function full_export(\stdClass $category): string {
+        $exporter = new qformat_markdown();
+        $exporter->setCategory($category);
+        $exporter->setContexts([\context::instance_by_id($category->contextid)]);
+        $exporter->setCourse(get_course(SITEID));
+
+        return $exporter->exportprocess();
+    }
+
+    /**
+     * Exporting reconstructs multichoice, truefalse, shortanswer and
+     * numerical questions in this format's own syntax, plus a "category"
+     * front matter line for the exported category.
+     */
+    public function test_export_reconstructs_supported_question_types(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category(['name' => 'Quiz de PHP']);
+
+        $md = "## What is the capital of France?\n" .
+              "- [ ] London\n" .
+              "- [x] Paris\n" .
+              "\n" .
+              "## PHP is a compiled language.\n" .
+              "- [x] False\n" .
+              "- [ ] True\n" .
+              "\n" .
+              "## What is the capital of Peru?\n" .
+              "= Lima\n" .
+              "> Lima is the capital of Peru.\n" .
+              "\n" .
+              "## What is the value of Pi to two decimal places?\n" .
+              "=# 3.14:0.01\n";
+
+        $this->full_import($md, $category);
+
+        $output = $this->full_export($category);
+
+        $this->assertStringContainsString("category: Quiz de PHP", $output);
+        $this->assertStringContainsString("## What is the capital of France?", $output);
+        $this->assertStringContainsString("- [ ] London", $output);
+        $this->assertStringContainsString("- [x] Paris", $output);
+        $this->assertStringContainsString("## PHP is a compiled language.", $output);
+        $this->assertStringContainsString("- [x] False", $output);
+        $this->assertStringContainsString("- [ ] True", $output);
+        $this->assertStringContainsString("## What is the capital of Peru?", $output);
+        $this->assertStringContainsString("= Lima", $output);
+        $this->assertStringContainsString("> Lima is the capital of Peru.", $output);
+        $this->assertStringContainsString("## What is the value of Pi to two decimal places?", $output);
+        $this->assertStringContainsString("=# 3.14:0.01", $output);
+    }
+
+    /**
+     * A question worth something other than Moodle's default of 1 gets an
+     * "@ value" line on export; a question left at the default doesn't.
+     */
+    public function test_export_reconstructs_mark_override(): void {
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+
+        $md = "## Worth three?\n" .
+              "@ 3\n" .
+              "- [x] Yes\n" .
+              "- [ ] No\n" .
+              "\n" .
+              "## Worth the default?\n" .
+              "- [x] Yes\n" .
+              "- [ ] No\n";
+
+        $this->full_import($md, $category);
+
+        $output = $this->full_export($category);
+
+        $this->assertStringContainsString("## Worth three?\n@ 3\n", $output);
+        $this->assertDoesNotMatchRegularExpression(
+            '/## Worth the default\?\n@/',
+            $output
+        );
+    }
 }

@@ -89,6 +89,22 @@ Or install from a zip via *Site administration → Plugins → Install plugins*.
 2. Choose **Markdown format**.
 3. Upload your `.md` file and import.
 
+## Export
+
+Go to *Question bank* → *Export*, choose **Markdown format** and the
+category to export, and download the `.md` file. The file uses the same
+syntax as import, including a `category` front matter line and, for any
+question worth something other than `1`, an `@ value` line.
+
+Only `multichoice`, `truefalse`, `shortanswer` and `numerical` questions
+are exported — other types (essay, matching, cloze, description, ...)
+can't be represented in this syntax and are left out of the file.
+
+If the export recurses into subcategories, every question is still written
+to the same `category` front matter line (the category you exported from):
+re-importing the file puts everything back into that one category, so
+subcategory structure isn't preserved round-trip.
+
 ## Re-importing (editing questions)
 
 Re-importing the same file updates existing questions instead of
@@ -107,10 +123,6 @@ want to keep distinct.
 
 Tested against Moodle 4.4, 4.5 and 5.0 on PHP 8.2/8.3 with PostgreSQL
 and MariaDB (see the CI matrix).
-
-## Roadmap
-
-- Export from the question bank back to Markdown.
 
 ## License
 

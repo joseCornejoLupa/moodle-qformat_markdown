@@ -64,6 +64,10 @@
  * nests subcategories) and "defaultmark" (applied to every question in
  * the file, instead of Moodle's default of 1).
  *
+ * Export (question bank -> Markdown) writes this same syntax back out for
+ * multichoice/truefalse/shortanswer/numerical questions. Other question
+ * types are silently skipped, since this format can't represent them.
+ *
  * @package    qformat_markdown
  * @copyright  2026 José Cornejo <jose.cornejo.lupa@gmail.com>
  * @license    https://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -98,11 +102,29 @@ class qformat_markdown extends qformat_default {
     protected ?float $frontmatterdefaultmark = null;
 
     /**
+     * Whether the "---" front matter header has already been written to
+     * the current export output. Only the first question written to the
+     * file carries it.
+     *
+     * @var bool
+     */
+    protected bool $wroteexportfrontmatter = false;
+
+    /**
      * This format can be used to import questions.
      *
      * @return bool
      */
     public function provide_import(): bool {
+        return true;
+    }
+
+    /**
+     * This format can be used to export questions.
+     *
+     * @return bool
+     */
+    public function provide_export(): bool {
         return true;
     }
 
@@ -539,5 +561,169 @@ class qformat_markdown extends qformat_default {
         }
 
         return $question;
+    }
+
+    /**
+     * Convert one question from the question bank into a Markdown block in
+     * our syntax. Called once per question by qformat_default::exportprocess().
+     *
+     * Only the question types this format can import back
+     * (multichoice/truefalse/shortanswer/numerical) are supported; anything
+     * else (essay, matching, cloze, description, category markers, ...) is
+     * skipped by returning null, which qformat_default treats as "leave
+     * this question out of the file".
+     *
+     * @param stdClass $question question object, with ->options->answers populated.
+     * @return string|null the Markdown block, or null to skip this question.
+     */
+    protected function writequestion($question) {
+        $writers = [
+            'multichoice' => 'write_multichoice_answers',
+            'truefalse' => 'write_truefalse_answers',
+            'shortanswer' => 'write_shortanswer_answers',
+            'numerical' => 'write_numerical_answers',
+        ];
+
+        if (!isset($writers[$question->qtype])) {
+            return null;
+        }
+
+        $out = $this->export_front_matter();
+        $out .= '## ' . $this->export_clean_line($question->questiontext) . "\n";
+        $out .= $this->export_mark($question);
+        $out .= $this->{$writers[$question->qtype]}($question);
+        $out .= $this->export_general_feedback($question);
+
+        return $out;
+    }
+
+    /**
+     * Build the "---" front matter header, once per export, from the
+     * category selected for this export. Every question in the export is
+     * written into the same file, so only that one category is recorded,
+     * even if the export recurses into subcategories: re-importing the
+     * file will put everything back under this single category.
+     *
+     * @return string the front matter block, or '' if already written once,
+     *      or if there's no export category to record.
+     */
+    protected function export_front_matter(): string {
+        if ($this->wroteexportfrontmatter) {
+            return '';
+        }
+        $this->wroteexportfrontmatter = true;
+
+        if (empty($this->category)) {
+            return '';
+        }
+
+        // Strip the internal "top" root category that create_category_path()
+        // (used on import) adds back automatically, so it round-trips.
+        $path = preg_replace('~^top/~', '', $this->get_category_path($this->category->id, false));
+        if ($path === '' || $path === 'top') {
+            return '';
+        }
+
+        return "---\ncategory: {$path}\n---\n\n";
+    }
+
+    /**
+     * Collapse a piece of question text to a single line, for use as a
+     * "## " heading or an answer/option line.
+     *
+     * @param string $text raw text.
+     * @return string
+     */
+    protected function export_clean_line(string $text): string {
+        return trim(preg_replace('/\s+/', ' ', $text));
+    }
+
+    /**
+     * Build the "- [ ]"/"- [x]" lines for a multichoice question.
+     *
+     * @param stdClass $question
+     * @return string
+     */
+    protected function write_multichoice_answers(stdClass $question): string {
+        $out = '';
+        foreach ($question->options->answers as $answer) {
+            $mark = ($answer->fraction > 0) ? 'x' : ' ';
+            $out .= "- [{$mark}] " . $this->export_clean_line($answer->answer) . "\n";
+        }
+        return $out;
+    }
+
+    /**
+     * Build the "- [ ]"/"- [x]" True/False lines for a truefalse question.
+     *
+     * @param stdClass $question
+     * @return string
+     */
+    protected function write_truefalse_answers(stdClass $question): string {
+        $trueanswer = $question->options->answers[$question->options->trueanswer];
+        $truemark = ($trueanswer->fraction > 0) ? 'x' : ' ';
+        $falsemark = ($trueanswer->fraction > 0) ? ' ' : 'x';
+        return "- [{$truemark}] True\n- [{$falsemark}] False\n";
+    }
+
+    /**
+     * Build the "= answer" lines for a shortanswer question.
+     *
+     * @param stdClass $question
+     * @return string
+     */
+    protected function write_shortanswer_answers(stdClass $question): string {
+        $out = '';
+        foreach ($question->options->answers as $answer) {
+            $out .= '= ' . $this->export_clean_line($answer->answer) . "\n";
+        }
+        return $out;
+    }
+
+    /**
+     * Build the "=# value:tolerance" lines for a numerical question.
+     *
+     * @param stdClass $question
+     * @return string
+     */
+    protected function write_numerical_answers(stdClass $question): string {
+        $out = '';
+        foreach ($question->options->answers as $answer) {
+            $tolerance = isset($answer->tolerance) ? (float) $answer->tolerance : 0;
+            $out .= "=# {$answer->answer}:{$tolerance}\n";
+        }
+        return $out;
+    }
+
+    /**
+     * Build the "> " general feedback lines, if the question has any.
+     *
+     * @param stdClass $question
+     * @return string
+     */
+    protected function export_general_feedback(stdClass $question): string {
+        if (empty($question->generalfeedback)) {
+            return '';
+        }
+        $out = '';
+        foreach (explode("\n", $question->generalfeedback) as $line) {
+            $out .= '> ' . $line . "\n";
+        }
+        return $out;
+    }
+
+    /**
+     * Build the "@ value" mark line, unless the question is worth Moodle's
+     * own default of 1, in which case it's left implicit.
+     *
+     * @param stdClass $question
+     * @return string
+     */
+    protected function export_mark(stdClass $question): string {
+        $mark = (float) $question->defaultmark;
+        if (abs($mark - 1.0) < 0.0001) {
+            return '';
+        }
+        return '@ ' . rtrim(rtrim(sprintf('%.4f', $mark), '0'), '.') . "\n";
     }
 }
