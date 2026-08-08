@@ -45,6 +45,17 @@
  */
 class qformat_markdown extends qformat_default {
     /**
+     * Question names (as saved to the database) produced by the current
+     * import, in the same order as {@see qformat_default::$questionids}.
+     * Used to match freshly imported questions back to their heading text
+     * when deciding whether to create a new version of an existing
+     * question instead of a duplicate.
+     *
+     * @var string[]
+     */
+    protected array $importednames = [];
+
+    /**
      * This format can be used to import questions.
      *
      * @return bool
@@ -74,6 +85,97 @@ class qformat_markdown extends qformat_default {
     }
 
     /**
+     * Run the standard import, then merge any freshly imported question
+     * that shares its name with an existing question in the target
+     * category into that question as a new version, instead of leaving it
+     * as a separate duplicate. qformat_default has no such merging: every
+     * import always creates a brand new question_bank_entries row.
+     *
+     * @return bool success
+     */
+    public function importprocess() {
+        $before = $this->existing_entries_by_name();
+
+        $result = parent::importprocess();
+
+        if ($result) {
+            $this->merge_reimported_questions($before);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Map the name of the current, latest-version question in each bank
+     * entry of the target category to that entry's id.
+     *
+     * @return array<string, int> name => question_bank_entries.id
+     */
+    protected function existing_entries_by_name(): array {
+        global $DB;
+
+        $sql = "SELECT qbe.id AS entryid, q.name
+                  FROM {question_bank_entries} qbe
+                  JOIN {question_versions} qv ON qv.questionbankentryid = qbe.id
+                  JOIN {question} q ON q.id = qv.questionid
+                 WHERE qbe.questioncategoryid = :categoryid
+                   AND qv.version = (SELECT MAX(qv2.version)
+                                        FROM {question_versions} qv2
+                                       WHERE qv2.questionbankentryid = qbe.id)";
+
+        $map = [];
+        foreach ($DB->get_records_sql($sql, ['categoryid' => $this->category->id]) as $record) {
+            $map[$record->name] = (int) $record->entryid;
+        }
+        return $map;
+    }
+
+    /**
+     * For each question just imported whose name matches a pre-existing
+     * question in the category, re-point its version row at the existing
+     * question_bank_entries row (as the next version number) and drop the
+     * now-empty entry that the standard import created for it.
+     *
+     * @param array<string, int> $before name => entry id, from before this import ran.
+     */
+    protected function merge_reimported_questions(array $before): void {
+        global $DB;
+
+        if (empty($before) || count($this->importednames) !== count($this->questionids)) {
+            // Nothing to match against, or a question was filtered out
+            // during import (e.g. invalid grade) so positions no longer
+            // line up reliably: skip merging rather than risk a wrong match.
+            return;
+        }
+
+        foreach ($this->questionids as $index => $newquestionid) {
+            $name = $this->importednames[$index];
+            if (!isset($before[$name])) {
+                continue;
+            }
+
+            $oldentryid = $before[$name];
+            $newversion = $DB->get_record('question_versions', ['questionid' => $newquestionid], '*', MUST_EXIST);
+            $orphanedentryid = $newversion->questionbankentryid;
+            if ($orphanedentryid == $oldentryid) {
+                continue;
+            }
+
+            $maxversion = $DB->get_field_sql(
+                'SELECT MAX(version) FROM {question_versions} WHERE questionbankentryid = ?',
+                [$oldentryid]
+            );
+
+            $DB->update_record('question_versions', (object) [
+                'id' => $newversion->id,
+                'questionbankentryid' => $oldentryid,
+                'version' => $maxversion + 1,
+            ]);
+            $DB->delete_records('question_bank_entries', ['id' => $orphanedentryid]);
+        }
+    }
+
+    /**
      * Parse the lines of the uploaded file into question objects.
      *
      * @param array $lines array of lines from the input file.
@@ -81,6 +183,7 @@ class qformat_markdown extends qformat_default {
      */
     public function readquestions($lines) {
         $questions = [];
+        $this->importednames = [];
         $blocks = $this->split_into_blocks($lines);
 
         foreach ($blocks as $block) {
@@ -152,9 +255,12 @@ class qformat_markdown extends qformat_default {
         }
 
         if ($this->is_truefalse($answers)) {
-            return $this->build_truefalse($name, $answers);
+            $question = $this->build_truefalse($name, $answers);
+        } else {
+            $question = $this->build_multichoice($name, $answers);
         }
-        return $this->build_multichoice($name, $answers);
+        $this->importednames[] = $question->name;
+        return $question;
     }
 
     /**

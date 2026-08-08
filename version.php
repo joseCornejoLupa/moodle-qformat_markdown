@@ -25,8 +25,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'qformat_markdown';
-$plugin->version   = 2026071800;        // YYYYMMDDXX.
+$plugin->version   = 2026071802;        // YYYYMMDDXX.
 $plugin->requires  = 2024042200;        // Moodle 4.4 or later.
 $plugin->supported = [404, 500];        // Moodle 4.4 to 5.0.
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->release   = '0.1.0';
+$plugin->release   = '0.1.2';

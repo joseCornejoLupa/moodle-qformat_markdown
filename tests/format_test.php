@@ -134,4 +134,96 @@ final class format_test extends \advanced_testcase {
         $this->assertCount(1, $questions);
         $this->assertSame('Valid question', $questions[0]->name);
     }
+
+    /**
+     * Run a markdown string through the full import pipeline (not just
+     * readquestions()), so importprocess() writes to the database and the
+     * question_bank_entries/question_versions merging logic runs.
+     *
+     * @param string $content markdown content.
+     * @param \stdClass $category question_categories record to import into.
+     */
+    protected function full_import(string $content, \stdClass $category): void {
+        $path = make_request_directory() . '/import.md';
+        file_put_contents($path, $content);
+
+        $importer = new qformat_markdown();
+        $importer->setCategory($category);
+        $importer->setContexts([\context::instance_by_id($category->contextid)]);
+        $importer->setCourse(get_course(SITEID));
+        $importer->setFilename($path);
+        $importer->setStoponerror(true);
+        $importer->set_display_progress(false);
+
+        $this->assertTrue($importer->importprocess());
+    }
+
+    /**
+     * Re-importing a file whose questions share a name with existing
+     * questions in the category creates new versions of them, instead of
+     * separate duplicate questions (qformat_default alone always creates a
+     * brand new question_bank_entries row on every import).
+     */
+    public function test_reimport_creates_new_version_not_duplicate(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+
+        $md = file_get_contents(__DIR__ . '/fixtures/sample.md');
+
+        $this->full_import($md, $category);
+        $entries = $DB->get_records('question_bank_entries', ['questioncategoryid' => $category->id]);
+        $this->assertCount(3, $entries);
+
+        $this->full_import($md, $category);
+
+        $this->assertEquals(
+            3,
+            $DB->count_records('question_bank_entries', ['questioncategoryid' => $category->id])
+        );
+        foreach (array_keys($entries) as $entryid) {
+            $this->assertEquals(
+                2,
+                $DB->count_records('question_versions', ['questionbankentryid' => $entryid])
+            );
+        }
+    }
+
+    /**
+     * Importing a question with a name that doesn't match anything already
+     * in the category creates a new question, without touching the
+     * existing ones.
+     */
+    public function test_import_of_new_question_does_not_affect_existing(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+
+        $this->full_import("## Existing question?\n- [x] Yes\n- [ ] No\n", $category);
+        $originalentry = $DB->get_record(
+            'question_bank_entries',
+            ['questioncategoryid' => $category->id],
+            '*',
+            MUST_EXIST
+        );
+
+        $this->full_import("## Brand new question?\n- [x] Yes\n- [ ] No\n", $category);
+
+        $this->assertEquals(
+            2,
+            $DB->count_records('question_bank_entries', ['questioncategoryid' => $category->id])
+        );
+        $this->assertEquals(
+            1,
+            $DB->count_records('question_versions', ['questionbankentryid' => $originalentry->id])
+        );
+    }
 }
