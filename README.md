@@ -37,6 +37,11 @@ defaultmark: 2
 ## What is the value of Pi to two decimal places?
 =# 3.14:0.01
 > Rounded to two decimal places.
+
+## What is the capital of Italy?
+@ 3
+- [ ] Milan
+- [x] Rome
 ```
 
 Rules:
@@ -54,6 +59,8 @@ Rules:
 - Any `> feedback text` line, regardless of question type, becomes general
   feedback shown after the question is answered. Several `> ` lines in the
   same block are joined into one feedback with line breaks between them.
+- An `@ value` line sets that question's own mark, overriding the
+  front matter's `defaultmark` (if any) for that question only.
 
 ## Front matter
 

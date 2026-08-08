@@ -40,6 +40,11 @@
  * =# 3.14:0.01
  * > Rounded to two decimal places.
  *
+ * ## What is the capital of Italy?
+ * @ 3
+ * - [ ] Milan
+ * - [x] Rome
+ *
  * A question with more than one "[x]" becomes a multi-answer
  * multichoice question. A question whose only options are True/False
  * becomes a truefalse question. A question with "= " lines instead of
@@ -49,7 +54,9 @@
  * is worth full credit. Don't mix checkbox and "="/"=#" lines in the
  * same block. Any "> " line in a block (regardless of qtype) becomes
  * general feedback shown after the question is answered; multiple "> "
- * lines are joined into one feedback with line breaks.
+ * lines are joined into one feedback with line breaks. An "@ value" line
+ * in a block sets that question's own mark, overriding the file-wide
+ * "defaultmark" (if any) for that question only.
  *
  * An optional "---" ... "---" front matter block at the very start of the
  * file sets defaults for the whole import: "category" (created under the
@@ -338,6 +345,7 @@ class qformat_markdown extends qformat_default {
         $shortanswers = [];
         $numericals = [];
         $feedbacklines = [];
+        $markoverride = null;
         foreach ($block as $line) {
             $line = trim($line);
             if (preg_match('/^-\s*\[( |x|X)\]\s*(.+)$/', $line, $matches)) {
@@ -351,6 +359,8 @@ class qformat_markdown extends qformat_default {
                 $shortanswers[] = trim($matches[1]);
             } else if (preg_match('/^>\s?(.*)$/', $line, $matches)) {
                 $feedbacklines[] = $matches[1];
+            } else if (preg_match('/^@\s*([0-9]+(?:\.[0-9]+)?)\s*$/', $line, $matches)) {
+                $markoverride = (float) $matches[1];
             }
         }
 
@@ -373,6 +383,9 @@ class qformat_markdown extends qformat_default {
 
         if ($this->frontmatterdefaultmark !== null) {
             $question->defaultmark = $this->frontmatterdefaultmark;
+        }
+        if ($markoverride !== null) {
+            $question->defaultmark = $markoverride;
         }
 
         $this->importednames[] = $question->name;

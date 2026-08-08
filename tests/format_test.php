@@ -355,6 +355,41 @@ final class format_test extends \advanced_testcase {
     }
 
     /**
+     * An "@ value" line inside a block sets that question's own mark,
+     * overriding the file-wide "defaultmark" front matter for that
+     * question only.
+     */
+    public function test_per_question_mark_override(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+        $this->setAdminUser();
+
+        $generator = $this->getDataGenerator()->get_plugin_generator('core_question');
+        $category = $generator->create_question_category();
+
+        $md = "---\n" .
+              "defaultmark: 2\n" .
+              "---\n" .
+              "## What is the capital of France?\n" .
+              "- [ ] London\n" .
+              "- [x] Paris\n" .
+              "\n" .
+              "## What is the capital of Italy?\n" .
+              "@ 3\n" .
+              "- [ ] Milan\n" .
+              "- [x] Rome\n";
+
+        $this->full_import($md, $category);
+
+        $withoutoverride = $DB->get_record('question', ['name' => 'What is the capital of France?'], '*', MUST_EXIST);
+        $this->assertEqualsWithDelta(2.0, $withoutoverride->defaultmark, 0.0001);
+
+        $withoverride = $DB->get_record('question', ['name' => 'What is the capital of Italy?'], '*', MUST_EXIST);
+        $this->assertEqualsWithDelta(3.0, $withoverride->defaultmark, 0.0001);
+    }
+
+    /**
      * A "category" front matter key creates (or reuses) a subcategory of
      * the one selected in the import screen, and questions are imported
      * into it instead.
